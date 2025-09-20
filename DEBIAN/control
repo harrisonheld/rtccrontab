@@ -1,0 +1,9 @@
+Package: rtccrontab
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: Harrison Held <harrydheld@gmail.com>
+Description: Cron replacement with automatic rtcwake before jobs.
+ A lightweight cron alternative that keeps its own crontab and schedules rtcwake for jobs.
+Depends: python3, python3-croniter, sudo
