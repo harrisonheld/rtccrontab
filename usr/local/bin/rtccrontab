@@ -18,9 +18,7 @@ except ImportError:
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
-    # format="%(asctime)s [%(levelname)s] %(message)s",
     format="%(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("rtccrontab")
 
@@ -42,9 +40,7 @@ def load_config():
         with open(CONFIG_FILE) as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if "=" not in line:
+                if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, value = line.split("=", 1)
                 key = key.strip()
@@ -56,20 +52,18 @@ def load_config():
                     except ValueError:
                         logger.warning(f"Ignoring invalid WAKE_OFFSET_MIN in config: {value}")
                 elif key == "BASE_DIR":
-                    # Expand ~ and environment variables
                     BASE_DIR = os.path.expandvars(os.path.expanduser(value))
                     logger.debug(f"Loaded BASE_DIR={BASE_DIR} from config")
 
-    # Recompute derived paths after loading BASE_DIR
     SRC_FILE = os.path.join(BASE_DIR, "rtccrontab")
     JOB_DIR = os.path.join(BASE_DIR, "jobs")
     CRON_D_FILE = f"/etc/cron.d/rtccrontab-{os.getenv('USER')}"
 
 
 def ensure_dirs():
-    logger.debug(f"Ensuring directories exist: {BASE_DIR}, {JOB_DIR}")
     os.makedirs(JOB_DIR, exist_ok=True)
     os.makedirs(BASE_DIR, exist_ok=True)
+    logger.debug(f"Ensured directories exist: {BASE_DIR}, {JOB_DIR}")
 
 
 def list_crontab():
@@ -137,7 +131,6 @@ def generate_jobs():
         command = " ".join(parts[5:])
         job_script_path = os.path.join(JOB_DIR, f"job{i}.sh")
 
-        # Write job wrapper that computes next wake itself
         with open(job_script_path, "w") as js:
             js.write(f"""#!/bin/bash
 # DO NOT EDIT
@@ -174,11 +167,9 @@ def schedule_next_wake():
 
     next_times = []
     with open(SRC_FILE) as f:
-        logger.debug(f"Reading rtccrontab: {SRC_FILE}")
         lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
 
     for line in lines:
-        logger.debug(f"scehedule_next_wake(): Processing line: {line}")
         parts = line.split()
         if len(parts) < 6:
             continue
@@ -186,26 +177,55 @@ def schedule_next_wake():
         it = croniter(schedule, datetime.now())
         nxt = it.get_next(datetime) - timedelta(minutes=WAKE_OFFSET_MIN)
         next_times.append(int(nxt.timestamp()))
-        logger.debug(f"Wake time for this line: {datetime.fromtimestamp(nxt.timestamp())}")
-
-    logger.debug(f"Next wake times: {next_times}")
 
     if next_times:
         earliest_waketime = min(next_times)
-        logger.debug(f"Earliest wake time: {datetime.fromtimestamp(earliest_waketime)}")
         try:
-            # Set rtcwake to the next computed time, do not sleep now
             subprocess.run(["sudo", "rtcwake", "-m", "no", "-t", str(earliest_waketime)], check=True)
             logger.info(f"Scheduled next wake at {datetime.fromtimestamp(earliest_waketime)}")
         except subprocess.CalledProcessError:
             logger.error("Failed to set rtcwake.")
 
 
+def check_capabilities():
+    """Check RTC and rtcwake capabilities on the system"""
+    logger.info("Checking system RTC/rtcwake capabilities...\n")
+
+    all_good = True
+
+    # Check if rtcwake is installed
+    rtcwake_path = shutil.which("rtcwake")
+    if not rtcwake_path:
+        logger.error("❌ rtcwake not found in PATH")
+        all_good = False
+    else:
+        logger.info(f"✅ rtcwake found at: {rtcwake_path}")
+
+    # Check available RTC devices
+    try:
+        rtc_devices = [f for f in os.listdir("/dev") if f.startswith("rtc")]
+    except Exception as e:
+        rtc_devices = []
+        logger.error(f"❌ Failed to list /dev: {e}")
+        all_good = False
+
+    if rtc_devices:
+        logger.info(f"✅ Found RTC devices: {', '.join(rtc_devices)}")
+    else:
+        logger.error("❌ No RTC devices found under /dev")
+        all_good = False
+
+    # Final summary
+    if all_good:
+        logger.info("\n✅ System looks ready for rtccrontab")
+    else:
+        logger.warning("\n❌ System may not be ready for rtccrontab; missing components above")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "rtccrontab - Cron replacement with automatic rtcwake before jobs. Keeps its own crontab.\n"
-            "\n"
+            "rtccrontab - Cron replacement with automatic rtcwake before jobs. Keeps its own crontab.\n\n"
             "Configuration can be set in /etc/rtccrontab.conf:\n"
             "  - BASE_DIR: location of user rtccrontab (~ expansion and $USER supported)\n"
             "  - WAKE_OFFSET_MIN: minutes before job to wake the system"
@@ -216,6 +236,7 @@ def main():
     parser.add_argument("-l", action="store_true", help="list rtccrontab")
     parser.add_argument("-r", action="store_true", help="remove rtccrontab")
     parser.add_argument("-w", action="store_true", help="schedule next wake")
+    parser.add_argument("-c", "--check", action="store_true", help="check system RTC/rtcwake capabilities")
     parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose logging")
     args = parser.parse_args()
 
@@ -233,6 +254,8 @@ def main():
         edit_crontab()
     elif args.w:
         schedule_next_wake()
+    elif args.check:
+        check_capabilities()
     else:
         parser.print_help()
 
