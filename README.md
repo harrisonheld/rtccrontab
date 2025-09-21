@@ -1,13 +1,15 @@
 # rtccrontab
-`rtccrontab` is a lightweight cron replacement with automatic system wake-up support. It allows you to schedule tasks in a familiar crontab format while automatically setting your computer to wake up shortly before each job.
+`rtccrontab` is a lightweight cron-like scheduler with automatic RTC wake-up support.  
+It lets you define jobs in a familiar crontab format, and ensures your system wakes up a few minutes before each job runs.
 
 ## How it works
-- Stores user crontabs in `~/rtccrontab/rtccrontab`, completely separate from the system crontab.
+- Stores user jobs in `~/.rtccrontab/rtccrontab`, separate from the system crontab.
 - Uses standard cron syntax: `MIN HOUR DOM MON DOW COMMAND`.
 - Generates a wrapper script for each job that:
   - Runs the command
-  - Schedules `rtcwake` to wake the system 10 minutes before the next the next execution time.
+  - Calls `rtccrontab -w` to schedule the system to wake up for the next job.
 - Installs a system cron file under `/etc/cron.d/rtccrontab-$USER` to execute the wrapper scripts at the scheduled times.
+- Global config is read from `/etc/rtccrontab.conf`
 
 ## Usage
 ```bash
