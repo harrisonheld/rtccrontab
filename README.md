@@ -13,6 +13,9 @@ It lets you define jobs in a familiar crontab format, and ensures your system wa
 
 ## Usage
 ```bash
+# Check if your hardware supports rtccrontab
+rtccrontab -c
+
 # Edit your rtccrontab
 rtccrontab -e
 
