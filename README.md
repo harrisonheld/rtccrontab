@@ -29,5 +29,5 @@ dpkg-deb --build . rtccrontab.deb
 
 # Installing
 ```bash
-dpkg -i rtccrontab.deb
+sudo dpkg -i rtccrontab.deb
 ```

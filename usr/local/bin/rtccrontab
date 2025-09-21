@@ -18,7 +18,8 @@ except ImportError:
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    # format="%(asctime)s [%(levelname)s] %(message)s",
+    format="%(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("rtccrontab")
@@ -100,7 +101,6 @@ def remove_crontab():
 
 def edit_crontab():
     logger.info(f"Editing rtccrontab: {SRC_FILE}")
-    ensure_dirs()
     if not os.path.exists(SRC_FILE):
         open(SRC_FILE, "w").close()
     tmp = tempfile.NamedTemporaryFile(delete=False)
@@ -114,7 +114,6 @@ def edit_crontab():
 
 def generate_jobs():
     logger.debug("Generating job scripts")
-    ensure_dirs()
 
     # Clean old jobs
     for f in os.listdir(JOB_DIR):
@@ -170,7 +169,6 @@ def generate_jobs():
 
 def schedule_next_wake():
     """Initial wake setup after generating jobs"""
-    ensure_dirs()
     if not os.path.exists(SRC_FILE):
         return
 
@@ -204,8 +202,16 @@ def schedule_next_wake():
 
 
 def main():
-    load_config()
-    parser = argparse.ArgumentParser(description="rtccrontab — cron with rtcwake per job")
+    parser = argparse.ArgumentParser(
+        description=(
+            "rtccrontab - Cron replacement with automatic rtcwake before jobs. Keeps its own crontab.\n"
+            "\n"
+            "Configuration can be set in /etc/rtccrontab.conf:\n"
+            "  - BASE_DIR: location of user rtccrontab (~ expansion and $USER supported)\n"
+            "  - WAKE_OFFSET_MIN: minutes before job to wake the system"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     parser.add_argument("-e", action="store_true", help="edit rtccrontab")
     parser.add_argument("-l", action="store_true", help="list rtccrontab")
     parser.add_argument("-r", action="store_true", help="remove rtccrontab")
@@ -215,6 +221,9 @@ def main():
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
+
+    load_config()
+    ensure_dirs()
 
     if args.l:
         list_crontab()

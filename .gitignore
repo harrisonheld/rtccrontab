@@ -6,17 +6,8 @@ __pycache__/
 .venv/
 venv/
 
-# Jobs folder (generated scripts)
-jobs/
-
-# Logs
 *.log
-
-# System cron.d files (generated)
-/etc/cron.d/
-
-# Temporary files
 *.swp
 *.tmp
 *.bak
-
+*.deb
