@@ -23,12 +23,46 @@ logging.basicConfig(
 )
 logger = logging.getLogger("rtccrontab")
 
-BASE_DIR = os.path.expanduser("~/rtccrontab")
+# Default configuration
+CONFIG_FILE = "/etc/rtccrontab.conf"
+EDITOR = os.getenv("EDITOR", "vi")
+WAKE_OFFSET_MIN = 5
+BASE_DIR = os.path.expanduser("~/.rtccrontab")
+
+# Derived paths (will be recomputed after config load)
 SRC_FILE = os.path.join(BASE_DIR, "rtccrontab")
 JOB_DIR = os.path.join(BASE_DIR, "jobs")
 CRON_D_FILE = f"/etc/cron.d/rtccrontab-{os.getenv('USER')}"
-WAKE_OFFSET_MIN = 10
-EDITOR = os.getenv("EDITOR", "vi")
+
+def load_config():
+    """Load configuration from /etc/rtccrontab.conf"""
+    global WAKE_OFFSET_MIN, BASE_DIR, SRC_FILE, JOB_DIR, CRON_D_FILE
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+                if key == "WAKE_OFFSET_MIN":
+                    try:
+                        WAKE_OFFSET_MIN = int(value)
+                        logger.debug(f"Loaded WAKE_OFFSET_MIN={WAKE_OFFSET_MIN} from config")
+                    except ValueError:
+                        logger.warning(f"Ignoring invalid WAKE_OFFSET_MIN in config: {value}")
+                elif key == "BASE_DIR":
+                    # Expand ~ and environment variables
+                    BASE_DIR = os.path.expandvars(os.path.expanduser(value))
+                    logger.debug(f"Loaded BASE_DIR={BASE_DIR} from config")
+
+    # Recompute derived paths after loading BASE_DIR
+    SRC_FILE = os.path.join(BASE_DIR, "rtccrontab")
+    JOB_DIR = os.path.join(BASE_DIR, "jobs")
+    CRON_D_FILE = f"/etc/cron.d/rtccrontab-{os.getenv('USER')}"
 
 
 def ensure_dirs():
@@ -114,7 +148,7 @@ def generate_jobs():
 {command}
 
 # Recompute next wake
-~/rtccrontab/rtccrontab -w
+{SRC_FILE} -w
 """)
         os.chmod(job_script_path, 0o755)
         cron_lines.append(f"{schedule} {os.getenv('USER')} {job_script_path}")
@@ -170,6 +204,7 @@ def schedule_next_wake():
 
 
 def main():
+    load_config()
     parser = argparse.ArgumentParser(description="rtccrontab — cron with rtcwake per job")
     parser.add_argument("-e", action="store_true", help="edit rtccrontab")
     parser.add_argument("-l", action="store_true", help="list rtccrontab")
