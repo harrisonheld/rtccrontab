@@ -67,7 +67,6 @@ def ensure_dirs():
 
 
 def list_crontab():
-    logger.info(f"Listing rtccrontab: {SRC_FILE}")
     if not os.path.exists(SRC_FILE):
         logger.warning("No rtccrontab file found.")
         return
@@ -83,13 +82,13 @@ def remove_crontab():
         shutil.rmtree(JOB_DIR)
     if os.path.exists(CRON_D_FILE):
         try:
-            subprocess.run(["sudo", "rm", "-f", CRON_D_FILE], check=True)
+            subprocess.run(["sudo", "rm", "-f", CRON_D_FILE], check=True, stdout=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
-            logger.error("Failed to remove system cron file. Run with sudo.")
+            logger.error("Failed to remove system cron file.")
     try:
-        subprocess.run(["sudo", "rtcwake", "-m", "disable"], check=True)
+        subprocess.run(["sudo", "rtcwake", "-m", "disable"], check=True, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
-        logger.error("Failed to disable rtcwake. Run with sudo.")
+        logger.error("Failed to disable rtcwake.")
     logger.info("rtccrontab removed and rtcwake unset.")
 
 
@@ -181,7 +180,7 @@ def schedule_next_wake():
     if next_times:
         earliest_waketime = min(next_times)
         try:
-            subprocess.run(["sudo", "rtcwake", "-m", "no", "-t", str(earliest_waketime)], check=True)
+            subprocess.run(["sudo", "rtcwake", "-m", "no", "-t", str(earliest_waketime)], check=True, stdout=subprocess.DEVNULL)
             logger.info(f"Scheduled next wake at {datetime.fromtimestamp(earliest_waketime)}")
         except subprocess.CalledProcessError:
             logger.error("Failed to set rtcwake.")
@@ -189,8 +188,6 @@ def schedule_next_wake():
 
 def check_capabilities():
     """Check RTC and rtcwake capabilities on the system"""
-    logger.info("Checking system RTC/rtcwake capabilities...\n")
-
     all_good = True
 
     # Check if rtcwake is installed
@@ -217,9 +214,9 @@ def check_capabilities():
 
     # Final summary
     if all_good:
-        logger.info("\n✅ System looks ready for rtccrontab")
+        logger.info("\n✅ System is ready for rtccrontab")
     else:
-        logger.warning("\n❌ System may not be ready for rtccrontab; missing components above")
+        logger.warning("\n❌ System is not ready for rtccrontab; missing components above")
 
 
 def main():
